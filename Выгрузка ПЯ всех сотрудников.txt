@@ -1,0 +1,58 @@
+// Выгрузка всех почтовых ящиков
+
+var MAX_ITEMS = 10000; // Ограничение числа выборки
+
+// Определение места для записи файла
+var targetFolder = space.childByNamePath('temp');
+
+// Удаление старых выгрузок
+var oldFiles = search.query({
+	query: "PATH:\"" + targetFolder.qnamePath + "/*\" AND @cm\\:name:'Выгрузка почты*'",
+	language: "fts-alfresco"
+});
+oldFiles.forEach(function(file) {
+	print('Нашел существующий файл "' + file.name + '", удаляю...');
+	file.remove();
+});
+
+// Создание файла
+var fileReport = targetFolder.createFile("Выгрузка почты " + rnUtils.formatDate(new Date(), "dd.MM.yyyy") + '.csv');
+fileReport.mimetype = "text/csv";
+
+// Запрос для поиска сотрудников
+var query = 
+	'TYPE:\"lecm\\-orgstr\\:employee\" AND ' +
+	'@lecm\\-dic\\:active:true AND ' +
+	'ISNOTNULL:\"lecm\\-orgstr\\:employee\\-email\"';
+
+try {
+	var employees = search.query({
+		query: query,
+		language: "fts-alfresco",
+		page: {maxItems: MAX_ITEMS}
+	});
+
+	// Сбор данных в память перед записью
+	var csvContent = ['\uFEFFФИО;Почта'];
+	for (var i = 0; i < employees.length; i++) {
+		var employee = employees[i];
+		var fullName = [
+			employee.properties['lecm-orgstr:employee-last-name'] || '',
+			employee.properties['lecm-orgstr:employee-first-name'] || '',
+			employee.properties['lecm-orgstr:employee-middle-name'] || ''
+		].join(' ').trim();
+
+		if (employee.properties['lecm-orgstr:employee-email']) {
+			csvContent.push(fullName + ';' + employee.properties['lecm-orgstr:employee-email']);
+		}
+	}
+
+	// Однократная запись в файл
+	fileReport.content = csvContent.join('\n');
+
+	print('Успешно обработано ' + employees.length + ' сотрудников');
+	print('Адрес выгрузки:\nhttp://department/share/page/document-details?nodeRef=' + fileReport.nodeRef);
+} catch (e) {
+	print('Ошибка при выполнении запроса: ' + e.toString());
+	throw e; // Перебрасываем ошибку дальше
+}
