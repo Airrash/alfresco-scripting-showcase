@@ -1,0 +1,77 @@
+// Метрики сервера и текущей JVM
+
+function getSystemMetrics() {
+	// Получаем данные о сегменте и нодах
+	var nodExmplrs = space.nodeRef.toString() == 'workspace://SpacesStore/00000000-0000-0000-0000-000000000000' ? 5 : 4;
+	// Получаем данные о системе
+	var osBean = Packages.java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+	var cores = osBean.getAvailableProcessors();
+	var loadAvg = osBean.getSystemLoadAverage();
+	var runtime = java.lang.Runtime.getRuntime();
+	// Рассчитываем метрики системы
+	var systemMemory = osBean.getTotalPhysicalMemorySize() / 1024 / 1024;
+	var freeSystemMemory = osBean.getFreePhysicalMemorySize() / 1024 / 1024;
+	var usedSystemMemory = systemMemory - freeSystemMemory;
+	var systemMemoryUsagePercent = (usedSystemMemory / systemMemory) * 100;
+	// Рассчитываем метрики JVM
+	var loadPercentage = (loadAvg / cores) * 100;
+	var jvmCpuUsage = osBean.getProcessCpuLoad() * 100;
+	var jvmMaxMemory = runtime.maxMemory() / 1024 / 1024;
+	var jvmUsedMemory = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
+	var jvmFreeMemory = runtime.freeMemory() / 1024 / 1024;
+	var jvmMemoryUsagePercent = (jvmUsedMemory / jvmMaxMemory) * 100;
+	var jvmUptime = Packages.java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime() / 1000
+	// Создаем progress bar
+	var systemMemoryBar = createProgressBar(systemMemoryUsagePercent, 20);
+	var jvmMemoryBar = createProgressBar(jvmMemoryUsagePercent, 20);
+	var cpuBar = createProgressBar(loadPercentage, 20);
+	var jvmCpuBar = createProgressBar(jvmCpuUsage, 20);
+	// Формируем вывод
+	var output = [
+		"======================== Системные метрики ========================",
+		"CPU:          " + cpuBar + " " + loadPercentage.toFixed(1) + "%",
+		"Память:       " + systemMemoryBar + " " + systemMemoryUsagePercent.toFixed(1) + "%",
+		"Всего:        " + systemMemory.toFixed(2) + " MB",
+		"Используется: " + usedSystemMemory.toFixed(2) + " MB",
+		"Свободно:     " + freeSystemMemory.toFixed(2) + " MB",
+		"",
+		"======================== Приложение (JVM) =========================",
+		"CPU:          " + jvmCpuBar + " " + jvmCpuUsage.toFixed(1) + "%",
+		"Общая память: " + jvmMemoryBar + " " + jvmMemoryUsagePercent.toFixed(1) + "%",
+		"Выделено:     " + jvmMaxMemory.toFixed(2) + " MB",
+		"Используется: " + jvmUsedMemory.toFixed(2) + " MB",
+		"Свободно:     " + jvmFreeMemory.toFixed(2) + " MB",
+		"",
+		"Uptime JVM:   " + formatUptime(jvmUptime.toFixed(1))
+	].join("\n");
+	return output;
+}
+
+function createProgressBar(percent, length) {
+	var filled = Math.round(percent / 100 * length);
+	filled = Math.min(filled, length);
+	filled = Math.max(filled, 0);
+	var bar = "[";
+	for (var i = 0; i < length; i++) {
+		if (percent >= 100) {
+			bar += (i < filled) ? "🟥" : "⬜";
+		} else {
+			bar += (i < filled) ? "🔳" : "⬜";
+		}
+	}
+	bar += "]";
+	return bar;
+}
+
+function formatUptime(seconds) {
+	var hours = Math.floor(seconds / 3600);
+	var minutes = Math.floor((seconds % 3600) / 60);
+	var secs = Math.floor(seconds % 60);
+	// Добавляем ведущий ноль, если число < 10
+	var pad = function(num) {
+		return num < 10 ? "0" + num : num;
+	};
+	return pad(hours) + ":" + pad(minutes) + ":" + pad(secs);
+}
+
+print(getSystemMetrics());
